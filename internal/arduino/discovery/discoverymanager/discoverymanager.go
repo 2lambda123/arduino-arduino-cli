@@ -174,6 +174,13 @@ func (dm *DiscoveryManager) Watch() (*PortWatcher, error) {
 	}
 	go func() {
 		dm.watchersMutex.Lock()
+		defer dm.watchersMutex.Unlock()
+
+		// if watcher is still online...
+		if _, ok := dm.watchers[watcher]; ok {
+			return
+		}
+
 		// When a watcher is started, send all the current active ports first...
 		for _, cache := range dm.watchersCache {
 			for _, ev := range cache {
@@ -182,7 +189,6 @@ func (dm *DiscoveryManager) Watch() (*PortWatcher, error) {
 		}
 		// ...and after that add the watcher to the list of watchers receiving events
 		dm.watchers[watcher] = true
-		dm.watchersMutex.Unlock()
 	}()
 	return watcher, nil
 }
