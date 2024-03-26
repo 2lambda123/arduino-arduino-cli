@@ -24,10 +24,10 @@ import (
 	"testing"
 
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
-	"github.com/arduino/arduino-cli/internal/cli/configuration"
 	"github.com/arduino/go-paths-helper"
 	"github.com/arduino/go-properties-orderedmap"
 	"github.com/stretchr/testify/require"
+	"go.bug.st/downloader/v2"
 	semver "go.bug.st/relaxed-semver"
 )
 
@@ -38,7 +38,7 @@ var dataDir1 = paths.New("testdata", "data_dir_1")
 var extraHardware = paths.New("testdata", "extra_hardware")
 
 func TestFindBoardWithFQBN(t *testing.T) {
-	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test")
+	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test", downloader.GetDefaultConfig())
 	pmb.LoadHardwareFromDirectory(customHardware)
 	pm := pmb.Build()
 	pme, release := pm.NewExplorer()
@@ -56,7 +56,7 @@ func TestFindBoardWithFQBN(t *testing.T) {
 
 func TestResolveFQBN(t *testing.T) {
 	// Pass nil, since these paths are only used for installing
-	pmb := NewBuilder(nil, nil, nil, nil, "test")
+	pmb := NewBuilder(nil, nil, nil, nil, "test", downloader.GetDefaultConfig())
 	// Hardware from main packages directory
 	pmb.LoadHardwareFromDirectory(dataDir1.Join("packages"))
 	// This contains the arduino:avr core
@@ -341,7 +341,7 @@ func TestResolveFQBN(t *testing.T) {
 }
 
 func TestBoardOptionsFunctions(t *testing.T) {
-	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test")
+	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test", downloader.GetDefaultConfig())
 	pmb.LoadHardwareFromDirectory(customHardware)
 	pm := pmb.Build()
 	pme, release := pm.NewExplorer()
@@ -381,7 +381,7 @@ func TestBoardOptionsFunctions(t *testing.T) {
 }
 
 func TestBoardOrdering(t *testing.T) {
-	pmb := NewBuilder(dataDir1, dataDir1.Join("packages"), nil, nil, "")
+	pmb := NewBuilder(dataDir1, dataDir1.Join("packages"), nil, nil, "", downloader.GetDefaultConfig())
 	_ = pmb.LoadHardwareFromDirectories(paths.NewPathList(dataDir1.Join("packages").String()))
 	pm := pmb.Build()
 	pme, release := pm.NewExplorer()
@@ -432,13 +432,13 @@ func TestBoardOrdering(t *testing.T) {
 
 func TestFindToolsRequiredForBoard(t *testing.T) {
 	t.Setenv("ARDUINO_DATA_DIR", dataDir1.String())
-	configuration.Settings = configuration.Init("")
 	pmb := NewBuilder(
 		dataDir1,
-		configuration.PackagesDir(configuration.Settings),
-		configuration.DownloadsDir(configuration.Settings),
+		dataDir1.Join("packages"),
+		dataDir1.Join("staging"),
 		dataDir1,
 		"test",
+		downloader.GetDefaultConfig(),
 	)
 
 	loadIndex := func(addr string) {
@@ -454,7 +454,7 @@ func TestFindToolsRequiredForBoard(t *testing.T) {
 	// We ignore the errors returned since they might not be necessarily blocking
 	// but just warnings for the user, like in the case a board is not loaded
 	// because of malformed menus
-	pmb.LoadHardware()
+	pmb.LoadHardware(settings)
 	pm := pmb.Build()
 	pme, release := pm.NewExplorer()
 	defer release()
@@ -567,7 +567,7 @@ func TestFindToolsRequiredForBoard(t *testing.T) {
 }
 
 func TestIdentifyBoard(t *testing.T) {
-	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test")
+	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test", downloader.GetDefaultConfig())
 	pmb.LoadHardwareFromDirectory(customHardware)
 	pm := pmb.Build()
 	pme, release := pm.NewExplorer()
@@ -594,12 +594,12 @@ func TestIdentifyBoard(t *testing.T) {
 
 func TestPackageManagerClear(t *testing.T) {
 	// Create a PackageManager and load the harware
-	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test")
+	pmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test", downloader.GetDefaultConfig())
 	pmb.LoadHardwareFromDirectory(customHardware)
 	pm := pmb.Build()
 
 	// Creates another PackageManager but don't load the hardware
-	emptyPmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test")
+	emptyPmb := NewBuilder(customHardware, customHardware, customHardware, customHardware, "test", downloader.GetDefaultConfig())
 	emptyPm := emptyPmb.Build()
 
 	// Verifies they're not equal
@@ -621,7 +621,7 @@ func TestFindToolsRequiredFromPlatformRelease(t *testing.T) {
 	require.NoError(t, err)
 	defer fakePath.RemoveAll()
 
-	pmb := NewBuilder(fakePath, fakePath, fakePath, fakePath, "test")
+	pmb := NewBuilder(fakePath, fakePath, fakePath, fakePath, "test", downloader.GetDefaultConfig())
 	pack := pmb.GetOrCreatePackage("arduino")
 
 	{
@@ -742,7 +742,7 @@ func TestFindToolsRequiredFromPlatformRelease(t *testing.T) {
 }
 
 func TestFindPlatformReleaseDependencies(t *testing.T) {
-	pmb := NewBuilder(nil, nil, nil, nil, "test")
+	pmb := NewBuilder(nil, nil, nil, nil, "test", downloader.GetDefaultConfig())
 	pmb.LoadPackageIndexFromFile(paths.New("testdata", "package_tooltest_index.json"))
 	pmb.calculateCompatibleReleases()
 	pm := pmb.Build()
@@ -758,7 +758,7 @@ func TestFindPlatformReleaseDependencies(t *testing.T) {
 
 func TestLegacyPackageConversionToPluggableDiscovery(t *testing.T) {
 	// Pass nil, since these paths are only used for installing
-	pmb := NewBuilder(nil, nil, nil, nil, "test")
+	pmb := NewBuilder(nil, nil, nil, nil, "test", downloader.GetDefaultConfig())
 	// Hardware from main packages directory
 	pmb.LoadHardwareFromDirectory(dataDir1.Join("packages"))
 	pm := pmb.Build()
@@ -828,7 +828,7 @@ func TestLegacyPackageConversionToPluggableDiscovery(t *testing.T) {
 
 func TestVariantAndCoreSelection(t *testing.T) {
 	// Pass nil, since these paths are only used for installing
-	pmb := NewBuilder(nil, nil, nil, nil, "test")
+	pmb := NewBuilder(nil, nil, nil, nil, "test", downloader.GetDefaultConfig())
 	// Hardware from main packages directory
 	pmb.LoadHardwareFromDirectory(dataDir1.Join("packages"))
 	pm := pmb.Build()
@@ -923,7 +923,7 @@ func TestVariantAndCoreSelection(t *testing.T) {
 }
 
 func TestRunScript(t *testing.T) {
-	pmb := NewBuilder(nil, nil, nil, nil, "test")
+	pmb := NewBuilder(nil, nil, nil, nil, "test", downloader.GetDefaultConfig())
 	pm := pmb.Build()
 	pme, release := pm.NewExplorer()
 	defer release()

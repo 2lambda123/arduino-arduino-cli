@@ -1,9 +1,11 @@
 module github.com/arduino/arduino-cli
 
-go 1.21
+go 1.21.1
 
 // We must use this fork until https://github.com/mailru/easyjson/pull/372 is merged
 replace github.com/mailru/easyjson => github.com/cmaglie/easyjson v0.8.1
+
+replace go.bug.st/configmap => ../go-configmap
 
 require (
 	github.com/ProtonMail/go-crypto v1.1.0-alpha.0
@@ -35,6 +37,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.bug.st/cleanup v1.0.0
+	go.bug.st/configmap v0.0.1
 	go.bug.st/downloader/v2 v2.1.1
 	go.bug.st/relaxed-semver v0.12.0
 	go.bug.st/testifyjson v1.1.1

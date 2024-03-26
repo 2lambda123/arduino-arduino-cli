@@ -16,16 +16,15 @@
 package config
 
 import (
+	"context"
 	"os"
-	"strings"
 
 	"github.com/arduino/arduino-cli/internal/cli/arguments"
-	"github.com/arduino/arduino-cli/internal/cli/configuration"
 	"github.com/arduino/arduino-cli/internal/cli/feedback"
+	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	"github.com/arduino/go-paths-helper"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -36,7 +35,7 @@ var (
 
 const defaultFileName = "arduino-cli.yaml"
 
-func initInitCommand() *cobra.Command {
+func initInitCommand(srv rpc.ArduinoCoreServiceServer) *cobra.Command {
 	initCommand := &cobra.Command{
 		Use:   "init",
 		Short: tr("Writes current configuration to a configuration file."),
@@ -50,7 +49,9 @@ func initInitCommand() *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			arguments.CheckFlagsConflicts(cmd, "dest-file", "dest-dir")
 		},
-		Run: runInitCommand,
+		Run: func(cmd *cobra.Command, args []string) {
+			runInitCommand(srv)
+		},
 	}
 	initCommand.Flags().StringVar(&destDir, "dest-dir", "", tr("Sets where to save the configuration file."))
 	initCommand.Flags().StringVar(&destFile, "dest-file", "", tr("Sets where to save the configuration file."))
@@ -58,11 +59,12 @@ func initInitCommand() *cobra.Command {
 	return initCommand
 }
 
-func runInitCommand(cmd *cobra.Command, args []string) {
+func runInitCommand(srv rpc.ArduinoCoreServiceServer) {
 	logrus.Info("Executing `arduino-cli config init`")
+	ctx := context.Background()
 
 	var configFileAbsPath *paths.Path
-	var absPath *paths.Path
+	var configFileDir *paths.Path
 	var err error
 
 	switch {
@@ -71,43 +73,46 @@ func runInitCommand(cmd *cobra.Command, args []string) {
 		if err != nil {
 			feedback.Fatal(tr("Cannot find absolute path: %v", err), feedback.ErrGeneric)
 		}
+		configFileDir = configFileAbsPath.Parent()
 
-		absPath = configFileAbsPath.Parent()
-	case destDir == "":
-		destDir = configuration.Settings.GetString("directories.Data")
-		fallthrough
-	default:
-		absPath, err = paths.New(destDir).Abs()
+	case destDir != "":
+		configFileDir, err = paths.New(destDir).Abs()
 		if err != nil {
 			feedback.Fatal(tr("Cannot find absolute path: %v", err), feedback.ErrGeneric)
 		}
-		configFileAbsPath = absPath.Join(defaultFileName)
+		configFileAbsPath = configFileDir.Join(defaultFileName)
+
+	default:
+		configFileAbsPath = paths.New(ctx.Value("config_file").(string))
+		configFileDir = configFileAbsPath.Parent()
 	}
 
 	if !overwrite && configFileAbsPath.Exist() {
 		feedback.Fatal(tr("Config file already exists, use --overwrite to discard the existing one."), feedback.ErrGeneric)
 	}
 
-	logrus.Infof("Writing config file to: %s", absPath)
+	logrus.Infof("Writing config file to: %s", configFileDir)
 
-	if err := absPath.MkdirAll(); err != nil {
+	if err := configFileDir.MkdirAll(); err != nil {
 		feedback.Fatal(tr("Cannot create config file directory: %v", err), feedback.ErrGeneric)
 	}
 
-	newSettings := viper.New()
-	configuration.SetDefaults(newSettings)
-	configuration.BindFlags(cmd, newSettings)
+	// for _, url := range newSettings.GetStringSlice("board_manager.additional_urls") {
+	// 	if strings.Contains(url, ",") {
+	// 		feedback.Fatal(tr("Urls cannot contain commas. Separate multiple urls exported as env var with a space:\n%s", url),
+	// 			feedback.ErrGeneric)
+	// 	}
+	// }
 
-	for _, url := range newSettings.GetStringSlice("board_manager.additional_urls") {
-		if strings.Contains(url, ",") {
-			feedback.Fatal(tr("Urls cannot contain commas. Separate multiple urls exported as env var with a space:\n%s", url),
-				feedback.ErrGeneric)
-		}
+	resp, err := srv.ConfigurationSave(ctx, &rpc.ConfigurationSaveRequest{Format: "yaml"})
+	if err != nil {
+		feedback.Fatal(tr("Error creating configuration: %v", err), feedback.ErrGeneric)
 	}
 
-	if err := newSettings.WriteConfigAs(configFileAbsPath.String()); err != nil {
+	if err := configFileAbsPath.WriteFile([]byte(resp.GetEncodedSettings())); err != nil {
 		feedback.Fatal(tr("Cannot create config file: %v", err), feedback.ErrGeneric)
 	}
+
 	feedback.PrintResult(initResult{ConfigFileAbsPath: configFileAbsPath})
 }
 
