@@ -74,7 +74,7 @@ func (pmb *Builder) loadProfilePlatform(platformRef *sketch.ProfilePlatformRefer
 	release := platform.GetOrCreateRelease(platformRef.Version)
 
 	uid := platformRef.InternalUniqueIdentifier()
-	destDir := configuration.ProfilesCacheDir(settings).Join(uid)
+	destDir := settings.ProfilesCacheDir().Join(uid)
 	if !destDir.IsDir() && installMissing {
 		// Try installing the missing platform
 		if err := pmb.installMissingProfilePlatform(platformRef, destDir, downloadCB, taskCB); err != nil {
@@ -142,7 +142,7 @@ func (pmb *Builder) loadProfileTool(toolRef *cores.ToolDependency, indexURL *url
 	tool := targetPackage.GetOrCreateTool(toolRef.ToolName)
 
 	uid := toolRef.InternalUniqueIdentifier(indexURL)
-	destDir := configuration.ProfilesCacheDir(settings).Join(uid)
+	destDir := settings.ProfilesCacheDir().Join(uid)
 
 	if !destDir.IsDir() && installMissing {
 		// Try installing the missing tool

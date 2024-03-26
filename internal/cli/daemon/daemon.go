@@ -16,15 +16,16 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 
-	"github.com/arduino/arduino-cli/internal/cli/configuration"
 	"github.com/arduino/arduino-cli/internal/cli/feedback"
 	"github.com/arduino/arduino-cli/internal/i18n"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
@@ -43,7 +44,7 @@ var (
 )
 
 // NewCommand created a new `daemon` command
-func NewCommand(srv rpc.ArduinoCoreServiceServer, defaultSettings *configuration.Settings) *cobra.Command {
+func NewCommand(srv rpc.ArduinoCoreServiceServer, settings *rpc.Configuration) *cobra.Command {
 	var daemonPort string
 	daemonCommand := &cobra.Command{
 		Use:     "daemon",
@@ -52,19 +53,34 @@ func NewCommand(srv rpc.ArduinoCoreServiceServer, defaultSettings *configuration
 		Args:    cobra.NoArgs,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			// Bundled libraries support is enabled by default when running as a daemon
-			defaultSettings.SetDefault(
-				"directories.builtin.Libraries",
-				configuration.GetDefaultBuiltinLibrariesDir())
+			if settings.GetDirectories().GetBuiltin().GetLibraries() == "" {
+				defaultBuiltinLibDir := filepath.Join(settings.GetDirectories().GetData(), "libraries")
+				settings.Directories.Builtin.Libraries = &defaultBuiltinLibDir
+			}
+			settings.Daemon.Port = &daemonPort
+			_, _ = srv.SettingsSet(context.Background(), &rpc.SettingsSetRequest{Settings: settings})
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			runDaemonCommand(srv, daemonPort)
 		},
 	}
-	daemonCommand.Flags().StringVar(&daemonPort, "port", defaultSettings.GetString("daemon.port"), tr("The TCP port the daemon will listen to"))
-	daemonCommand.Flags().BoolVar(&daemonize, "daemonize", false, tr("Do not terminate daemon process if the parent process dies"))
-	daemonCommand.Flags().BoolVar(&debug, "debug", false, tr("Enable debug logging of gRPC calls"))
-	daemonCommand.Flags().StringVar(&debugFile, "debug-file", "", tr("Append debug logging to the specified file"))
-	daemonCommand.Flags().StringSliceVar(&debugFilters, "debug-filter", []string{}, tr("Display only the provided gRPC calls"))
+	defaultDaemonPort := settings.GetDaemon().GetPort()
+
+	daemonCommand.Flags().StringVar(&daemonPort,
+		"port", defaultDaemonPort,
+		tr("The TCP port the daemon will listen to"))
+	daemonCommand.Flags().BoolVar(&daemonize,
+		"daemonize", false,
+		tr("Do not terminate daemon process if the parent process dies"))
+	daemonCommand.Flags().BoolVar(&debug,
+		"debug", false,
+		tr("Enable debug logging of gRPC calls"))
+	daemonCommand.Flags().StringVar(&debugFile,
+		"debug-file", "",
+		tr("Append debug logging to the specified file"))
+	daemonCommand.Flags().StringSliceVar(&debugFilters,
+		"debug-filter", []string{},
+		tr("Display only the provided gRPC calls"))
 	return daemonCommand
 }
 

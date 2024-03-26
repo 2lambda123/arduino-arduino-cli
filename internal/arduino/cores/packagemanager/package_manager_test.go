@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
-	"github.com/arduino/arduino-cli/internal/cli/configuration"
 	"github.com/arduino/go-paths-helper"
 	"github.com/arduino/go-properties-orderedmap"
 	"github.com/stretchr/testify/require"
@@ -433,11 +432,10 @@ func TestBoardOrdering(t *testing.T) {
 
 func TestFindToolsRequiredForBoard(t *testing.T) {
 	t.Setenv("ARDUINO_DATA_DIR", dataDir1.String())
-	settings := configuration.Init("")
 	pmb := NewBuilder(
 		dataDir1,
-		configuration.PackagesDir(settings),
-		configuration.DownloadsDir(settings),
+		dataDir1.Join("packages"),
+		dataDir1.Join("staging"),
 		dataDir1,
 		"test",
 		downloader.GetDefaultConfig(),

@@ -20,21 +20,19 @@ import (
 
 	"github.com/arduino/arduino-cli/internal/cli/configuration"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
+	"github.com/arduino/arduino-cli/version"
 )
 
 // NewArduinoCoreServer returns an implementation of the ArduinoCoreService gRPC service
 // that uses the provided version string.
-func NewArduinoCoreServer(version string, settings *configuration.Settings) rpc.ArduinoCoreServiceServer {
+func NewArduinoCoreServer() rpc.ArduinoCoreServiceServer {
 	return &arduinoCoreServerImpl{
-		versionString: version,
-		settings:      settings,
+		settings: configuration.NewSettings(),
 	}
 }
 
 type arduinoCoreServerImpl struct {
 	rpc.UnsafeArduinoCoreServiceServer // Force compile error for unimplemented methods
-
-	versionString string
 
 	// Settings holds configurations of the CLI and the gRPC consumers
 	settings *configuration.Settings
@@ -42,5 +40,5 @@ type arduinoCoreServerImpl struct {
 
 // Version returns the version of the Arduino CLI
 func (s *arduinoCoreServerImpl) Version(ctx context.Context, req *rpc.VersionRequest) (*rpc.VersionResponse, error) {
-	return &rpc.VersionResponse{Version: s.versionString}, nil
+	return &rpc.VersionResponse{Version: version.VersionInfo.VersionString}, nil
 }

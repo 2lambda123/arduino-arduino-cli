@@ -16,55 +16,52 @@
 package configuration
 
 import (
-	"path/filepath"
-	"strings"
+	"os"
 	"time"
 )
 
 // SetDefaults sets the default values for certain keys
 func SetDefaults(settings *Settings) {
 	// logging
-	settings.SetDefault("logging.level", "info")
-	settings.SetDefault("logging.format", "text")
+	settings.Defaults.SetString("logging.level", "info")
+	settings.Defaults.SetString("logging.format", "text")
 
 	// Libraries
-	settings.SetDefault("library.enable_unsafe_install", false)
+	settings.Defaults.SetBool("library.enable_unsafe_install", false)
 
 	// Boards Manager
-	settings.SetDefault("board_manager.additional_urls", []string{})
+	settings.Defaults.Set("board_manager.additional_urls", []string{})
 
 	// arduino directories
-	settings.SetDefault("directories.Data", getDefaultArduinoDataDir())
-	settings.SetDefault("directories.Downloads", filepath.Join(getDefaultArduinoDataDir(), "staging"))
-	settings.SetDefault("directories.User", getDefaultUserDir())
+	settings.Defaults.SetString("directories.data", getDefaultArduinoDataDir())
+	settings.Defaults.SetString("directories.downloads", "")
+	settings.Defaults.SetString("directories.user", getDefaultUserDir())
 
 	// Sketch compilation
-	settings.SetDefault("sketch.always_export_binaries", false)
-	settings.SetDefault("build_cache.ttl", time.Hour*24*30)
-	settings.SetDefault("build_cache.compilations_before_purge", 10)
+	settings.Defaults.SetBool("sketch.always_export_binaries", false)
+	settings.Defaults.SetUint("build_cache.ttl", uint(time.Hour*24*30))
+	settings.Defaults.SetUint("build_cache.compilations_before_purge", 10)
 
 	// daemon settings
-	settings.SetDefault("daemon.port", "50051")
+	settings.Defaults.SetString("daemon.port", "50051")
 
 	// metrics settings
-	settings.SetDefault("metrics.enabled", true)
-	settings.SetDefault("metrics.addr", ":9090")
+	settings.Defaults.SetBool("metrics.enabled", true)
+	settings.Defaults.SetString("metrics.addr", ":9090")
 
 	// output settings
-	settings.SetDefault("output.no_color", false)
+	settings.Defaults.SetBool("output.no_color", false)
 
 	// updater settings
-	settings.SetDefault("updater.enable_notification", true)
+	settings.Defaults.SetBool("updater.enable_notification", true)
 
 	// Bind env vars
-	settings.SetEnvPrefix("ARDUINO")
-	settings.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	settings.AutomaticEnv()
+	settings.Defaults.InjectEnvVars(os.Environ(), "ARDUINO")
 
 	// Bind env aliases to keep backward compatibility
-	settings.BindEnv("library.enable_unsafe_install", "ARDUINO_ENABLE_UNSAFE_LIBRARY_INSTALL")
-	settings.BindEnv("directories.User", "ARDUINO_SKETCHBOOK_DIR")
-	settings.BindEnv("directories.Downloads", "ARDUINO_DOWNLOADS_DIR")
-	settings.BindEnv("directories.Data", "ARDUINO_DATA_DIR")
-	settings.BindEnv("sketch.always_export_binaries", "ARDUINO_SKETCH_ALWAYS_EXPORT_BINARIES")
+	// settings.defaults.BindEnv("library.enable_unsafe_install", "ARDUINO_ENABLE_UNSAFE_LIBRARY_INSTALL")
+	// settings.defaults.BindEnv("directories.User", "ARDUINO_SKETCHBOOK_DIR")
+	// settings.defaults.BindEnv("directories.Downloads", "ARDUINO_DOWNLOADS_DIR")
+	// settings.defaults.BindEnv("directories.Data", "ARDUINO_DATA_DIR")
+	// settings.defaults.BindEnv("sketch.always_export_binaries", "ARDUINO_SKETCH_ALWAYS_EXPORT_BINARIES")
 }

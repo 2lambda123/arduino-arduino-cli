@@ -18,14 +18,13 @@ package config
 import (
 	"os"
 
-	"github.com/arduino/arduino-cli/internal/cli/configuration"
 	"github.com/arduino/arduino-cli/internal/cli/feedback"
+	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
-func initDumpCommand(defaultSettings *configuration.Settings) *cobra.Command {
+func initDumpCommand(srv rpc.ArduinoCoreServiceServer) *cobra.Command {
 	var dumpCommand = &cobra.Command{
 		Use:     "dump",
 		Short:   tr("Prints the current configuration"),
@@ -34,16 +33,46 @@ func initDumpCommand(defaultSettings *configuration.Settings) *cobra.Command {
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			logrus.Info("Executing `arduino-cli config dump`")
-			feedback.PrintResult(dumpResult{defaultSettings.AllSettings()})
+			res := &rawResult{}
+			switch feedback.GetFormat() {
+			case feedback.JSON, feedback.MinifiedJSON:
+				resp, err := srv.ConfigurationSave(cmd.Context(), &rpc.ConfigurationSaveRequest{Format: "json"})
+				if err != nil {
+					logrus.Fatalf("Error creating configuration: %v", err)
+				}
+				res.rawJSON = []byte(resp.GetEncodedSettings())
+			case feedback.YAML, feedback.Text:
+				resp, err := srv.ConfigurationSave(cmd.Context(), &rpc.ConfigurationSaveRequest{Format: "yaml"})
+				if err != nil {
+					logrus.Fatalf("Error creating configuration: %v", err)
+				}
+				res.rawYAML = []byte(resp.GetEncodedSettings())
+			default:
+				logrus.Fatalf("Unsupported format: %v", feedback.GetFormat())
+			}
+			feedback.PrintResult(dumpResult{Config: res})
 		},
 	}
 	return dumpCommand
 }
 
-// output from this command requires special formatting, let's create a dedicated
-// feedback.Result implementation
+type rawResult struct {
+	rawJSON []byte
+	rawYAML []byte
+}
+
+func (r *rawResult) MarshalJSON() ([]byte, error) {
+	// it is already encoded in rawJSON field
+	return r.rawJSON, nil
+}
+
+func (r *rawResult) MarshalYAML() (interface{}, error) {
+	// it is already encoded in rawYAML field
+	return r.rawYAML, nil
+}
+
 type dumpResult struct {
-	Config map[string]interface{} `json:"config"`
+	Config *rawResult
 }
 
 func (dr dumpResult) Data() interface{} {
@@ -51,10 +80,6 @@ func (dr dumpResult) Data() interface{} {
 }
 
 func (dr dumpResult) String() string {
-	bs, err := yaml.Marshal(dr.Config)
-	if err != nil {
-		// Should never happen
-		panic(tr("unable to marshal config to YAML: %v", err))
-	}
-	return string(bs)
+	// In case of text output do not wrap the output in outer JSON or YAML structure
+	return string(dr.Config.rawYAML)
 }

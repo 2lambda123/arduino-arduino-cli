@@ -52,14 +52,8 @@ func UserAgent(settings *Settings) string {
 }
 
 // NetworkProxy returns the proxy configuration (mainly used by HTTP clients)
-func NetworkProxy(settings *Settings) (*url.URL, error) {
-	if settings == nil || !settings.IsSet("network.proxy") {
-		return nil, nil
-	}
-	if proxyConfig := settings.GetString("network.proxy"); proxyConfig == "" {
-		// empty configuration
-		// this workaround must be here until viper can UnSet properties:
-		// https://github.com/spf13/viper/pull/519
+func (settings *Settings) NetworkProxy() (*url.URL, error) {
+	if proxyConfig, ok, _ := settings.GetStringOk("network.proxy"); !ok {
 		return nil, nil
 	} else if proxy, err := url.Parse(proxyConfig); err != nil {
 		return nil, fmt.Errorf(tr("Invalid network.proxy '%[1]s': %[2]s"), proxyConfig, err)
@@ -70,7 +64,7 @@ func NetworkProxy(settings *Settings) (*url.URL, error) {
 
 // NewHttpClient returns a new http client for use in the arduino-cli
 func (settings *Settings) NewHttpClient() (*http.Client, error) {
-	proxy, err := NetworkProxy(settings)
+	proxy, err := settings.NetworkProxy()
 	if err != nil {
 		return nil, err
 	}

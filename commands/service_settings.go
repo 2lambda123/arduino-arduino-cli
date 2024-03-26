@@ -18,161 +18,88 @@ package commands
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
+	"reflect"
 
-	"github.com/arduino/arduino-cli/internal/cli/configuration"
+	"github.com/arduino/arduino-cli/commands/cmderrors"
 	rpc "github.com/arduino/arduino-cli/rpc/cc/arduino/cli/commands/v1"
 )
-
-// SettingsGetAll returns a message with a string field containing all the settings
-// currently in use, marshalled in JSON format.
-func (s *arduinoCoreServerImpl) SettingsGetAll(ctx context.Context, req *rpc.SettingsGetAllRequest) (*rpc.SettingsGetAllResponse, error) {
-	b, err := json.Marshal(s.settings.AllSettings())
-	if err == nil {
-		return &rpc.SettingsGetAllResponse{
-			JsonData: string(b),
-		}, nil
-	}
-
-	return nil, err
-}
-
-// mapper converts a map of nested maps to a map of scalar values.
-// For example:
-//
-//	{"foo": "bar", "daemon":{"port":"420"}, "sketch": {"always_export_binaries": "true"}}
-//
-// would convert to:
-//
-//	{"foo": "bar", "daemon.port":"420", "sketch.always_export_binaries": "true"}
-func mapper(toMap map[string]interface{}) map[string]interface{} {
-	res := map[string]interface{}{}
-	for k, v := range toMap {
-		switch data := v.(type) {
-		case map[string]interface{}:
-			for mK, mV := range mapper(data) {
-				// Concatenate keys
-				res[fmt.Sprintf("%s.%s", k, mK)] = mV
-			}
-			// This is done to avoid skipping keys containing empty maps
-			if len(data) == 0 {
-				res[k] = map[string]interface{}{}
-			}
-		default:
-			res[k] = v
-		}
-	}
-	return res
-}
-
-// SettingsMerge applies multiple settings values at once.
-func (s *arduinoCoreServerImpl) SettingsMerge(ctx context.Context, req *rpc.SettingsMergeRequest) (*rpc.SettingsMergeResponse, error) {
-	var toMerge map[string]interface{}
-	if err := json.Unmarshal([]byte(req.GetJsonData()), &toMerge); err != nil {
-		return nil, err
-	}
-
-	mapped := mapper(toMerge)
-
-	// Set each value individually.
-	// This is done because Viper ignores empty strings or maps when
-	// using the MergeConfigMap function.
-	updatedSettings := configuration.Init("")
-	for k, v := range mapped {
-		updatedSettings.Set(k, v)
-	}
-	configPath := s.settings.ConfigFileUsed()
-	updatedSettings.SetConfigFile(configPath)
-	s.settings = updatedSettings
-
-	return &rpc.SettingsMergeResponse{}, nil
-}
 
 // SettingsGetValue returns a settings value given its key. If the key is not present
 // an error will be returned, so that we distinguish empty settings from missing
 // ones.
+func (s *arduinoCoreServerImpl) ConfigurationGet(ctx context.Context, req *rpc.ConfigurationGetRequest) (*rpc.ConfigurationGetResponse, error) {
+	// TODO
+	return &rpc.ConfigurationGetResponse{}, nil
+}
+
+func (s *arduinoCoreServerImpl) SettingsSetValue(ctx context.Context, req *rpc.SettingsSetValueRequest) (*rpc.SettingsSetValueResponse, error) {
+	// Determine the existence and the kind of the value
+	key := req.GetKey()
+	defaultValue, ok := s.settings.Defaults.GetOk(key)
+	if !ok {
+		return nil, &cmderrors.InvalidArgumentError{Message: fmt.Sprintf("key %s not found", key)}
+	}
+	expectedType := reflect.TypeOf(defaultValue)
+
+	// Extract the value from the request
+	var newValue any
+	if err := json.Unmarshal([]byte(req.GetValueJson()), &newValue); err != nil {
+		return nil, &cmderrors.InvalidArgumentError{Message: fmt.Sprintf("invalid value: %v", err)}
+	}
+	newValueType := reflect.TypeOf(newValue)
+
+	// Check if the value is of the same type of the default value
+	if newValueType != expectedType {
+		return nil, &cmderrors.InvalidArgumentError{Message: fmt.Sprintf("value type mismatch: expected %T, got %T", defaultValue, newValue)}
+	}
+
+	// Set the value
+	s.settings.Set(key, newValue)
+	return &rpc.SettingsSetValueResponse{}, nil
+}
+
 func (s *arduinoCoreServerImpl) SettingsGetValue(ctx context.Context, req *rpc.SettingsGetValueRequest) (*rpc.SettingsGetValueResponse, error) {
 	key := req.GetKey()
-
-	// Check if settings key actually existing, we don't use Viper.InConfig()
-	// since that doesn't check for keys formatted like daemon.port or those set
-	// with Viper.Set(). This way we check for all existing settings for sure.
-	keyExists := false
-	for _, k := range s.settings.AllKeys() {
-		if k == key || strings.HasPrefix(k, key) {
-			keyExists = true
-			break
-		}
+	value, ok := s.settings.GetOk(key)
+	if !ok {
+		value, ok = s.settings.Defaults.GetOk(key)
 	}
-	if !keyExists {
-		return nil, errors.New(tr("key not found in settings"))
+	if !ok {
+		return nil, &cmderrors.InvalidArgumentError{Message: fmt.Sprintf("key %s not found", key)}
 	}
-
-	b, err := json.Marshal(s.settings.Get(key))
-	value := &rpc.SettingsGetValueResponse{}
-	if err == nil {
-		value.Key = key
-		value.JsonData = string(b)
+	valueJson, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling value: %v", err)
 	}
-
-	return value, err
+	return &rpc.SettingsGetValueResponse{
+		ValueJson: string(valueJson),
+	}, nil
 }
 
-// SettingsSetValue updates or set a value for a certain key.
-func (s *arduinoCoreServerImpl) SettingsSetValue(ctx context.Context, val *rpc.SettingsSetValueRequest) (*rpc.SettingsSetValueResponse, error) {
-	key := val.GetKey()
-	var value interface{}
-
-	err := json.Unmarshal([]byte(val.GetJsonData()), &value)
-	if err == nil {
-		s.settings.Set(key, value)
-	}
-
-	return &rpc.SettingsSetValueResponse{}, err
+// ConfigurationSave encodes the current configuration in the specified format
+func (s *arduinoCoreServerImpl) ConfigurationSave(ctx context.Context, req *rpc.ConfigurationSaveRequest) (*rpc.ConfigurationSaveResponse, error) {
+	// TODO
+	return &rpc.ConfigurationSaveResponse{}, nil
 }
 
-// SettingsWrite to file set in request the settings currently stored in memory.
-// We don't have a Read() function, that's not necessary since we only want one config file to be used
-// and that's picked up when the CLI is run as daemon, either using the default path or a custom one
-// set with the --config-file flag.
-func (s *arduinoCoreServerImpl) SettingsWrite(ctx context.Context, req *rpc.SettingsWriteRequest) (*rpc.SettingsWriteResponse, error) {
-	if err := s.settings.WriteConfigAs(req.GetFilePath()); err != nil {
-		return nil, err
-	}
-	return &rpc.SettingsWriteResponse{}, nil
+// SettingsReadFromFile read settings from a YAML file and replace the settings currently stored in memory.
+func (s *arduinoCoreServerImpl) ConfigurationOpen(ctx context.Context, req *rpc.ConfigurationOpenRequest) (*rpc.ConfigurationOpenResponse, error) {
+	// TODO
+	return &rpc.ConfigurationOpenResponse{}, nil
 }
 
-// SettingsDelete removes a key from the config file
-func (s *arduinoCoreServerImpl) SettingsDelete(ctx context.Context, req *rpc.SettingsDeleteRequest) (*rpc.SettingsDeleteResponse, error) {
-	toDelete := req.GetKey()
-
-	// Check if settings key actually existing, we don't use Viper.InConfig()
-	// since that doesn't check for keys formatted like daemon.port or those set
-	// with Viper.Set(). This way we check for all existing settings for sure.
-	keyExists := false
-	keys := []string{}
-	for _, k := range s.settings.AllKeys() {
-		if !strings.HasPrefix(k, toDelete) {
-			keys = append(keys, k)
-			continue
-		}
-		keyExists = true
+// SettingsEnumerate returns the list of all the settings keys.
+func (s *arduinoCoreServerImpl) SettingsEnumerate(ctx context.Context, req *rpc.SettingsEnumerateRequest) (*rpc.SettingsEnumerateResponse, error) {
+	var entries []*rpc.SettingsEnumerateResponse_Entry
+	for _, k := range s.settings.Defaults.AllKeys() {
+		v := s.settings.Defaults.Get(k)
+		entries = append(entries, &rpc.SettingsEnumerateResponse_Entry{
+			Key:  k,
+			Type: reflect.TypeOf(v).String(),
+		})
 	}
-
-	if !keyExists {
-		return nil, errors.New(tr("key not found in settings"))
-	}
-
-	// Override current settings to delete the key
-	updatedSettings := configuration.Init("")
-	for _, k := range keys {
-		updatedSettings.Set(k, s.settings.Get(k))
-	}
-	configPath := s.settings.ConfigFileUsed()
-	updatedSettings.SetConfigFile(configPath)
-	s.settings = updatedSettings
-
-	return &rpc.SettingsDeleteResponse{}, nil
+	return &rpc.SettingsEnumerateResponse{
+		Entries: entries,
+	}, nil
 }

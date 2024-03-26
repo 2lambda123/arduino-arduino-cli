@@ -32,7 +32,7 @@ import (
 
 // LoadHardware read all plaforms from the configured paths
 func (pm *Builder) LoadHardware(settings *configuration.Settings) []error {
-	hardwareDirs := configuration.HardwareDirectories(settings)
+	hardwareDirs := settings.HardwareDirectories()
 	return pm.LoadHardwareFromDirectories(hardwareDirs)
 }
 
