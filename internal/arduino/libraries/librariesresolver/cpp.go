@@ -22,6 +22,7 @@ import (
 
 	"github.com/arduino/arduino-cli/internal/arduino/cores"
 	"github.com/arduino/arduino-cli/internal/arduino/libraries"
+	"github.com/arduino/arduino-cli/internal/arduino/sketch"
 	"github.com/arduino/arduino-cli/internal/arduino/utils"
 	"github.com/arduino/arduino-cli/internal/i18n"
 	"github.com/schollz/closestmatch"
@@ -36,7 +37,7 @@ type Cpp struct {
 var tr = i18n.Tr
 
 // NewCppResolver creates a new Cpp resolver
-func NewCppResolver(allLibs []*libraries.Library, targetPlatform, actualPlatform *cores.PlatformRelease) *Cpp {
+func NewCppResolver(allLibs []*libraries.Library, sk *sketch.Sketch, targetPlatform, actualPlatform *cores.PlatformRelease) *Cpp {
 	resolver := &Cpp{
 		headers: map[string]libraries.List{},
 	}
@@ -46,8 +47,15 @@ func NewCppResolver(allLibs []*libraries.Library, targetPlatform, actualPlatform
 	if actualPlatform != targetPlatform {
 		resolver.ScanPlatformLibraries(allLibs, actualPlatform)
 	}
-
+	resolver.ScanSketchLibraries(sk)
 	return resolver
+}
+
+// ScanSketchLibraries loads libraries bundled with the sketch
+func (resolver *Cpp) ScanSketchLibraries(sk *sketch.Sketch) {
+	for _, lib := range sk.VendoredLibraries() {
+		_ = resolver.ScanLibrary(lib)
+	}
 }
 
 // ScanIDEBuiltinLibraries reads ide-builtin librariers loaded in the LibrariesManager to find
