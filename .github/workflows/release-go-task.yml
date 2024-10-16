@@ -300,7 +300,7 @@ jobs:
 
       - name: Update Homebrew formula
         if: steps.prerelease.outputs.IS_PRE != 'true'
-        uses: dawidd6/action-homebrew-bump-formula@v3
+        uses: dawidd6/action-homebrew-bump-formula@v4
         with:
           token: ${{ secrets.ARDUINOBOT_GITHUB_TOKEN }}
           formula: arduino-cli
