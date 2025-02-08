@@ -39,7 +39,7 @@ require (
 	go.bug.st/downloader/v2 v2.2.0
 	go.bug.st/relaxed-semver v0.12.0
 	go.bug.st/testifyjson v1.3.0
-	golang.org/x/term v0.28.0
+	golang.org/x/term v0.29.0
 	golang.org/x/text v0.22.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241202173237-19429a94021a
 	google.golang.org/grpc v1.70.0
@@ -102,7 +102,7 @@ require (
 	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
