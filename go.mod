@@ -1,8 +1,6 @@
 module github.com/arduino/arduino-cli
 
 go 1.21
-toolchain go1.24.1
-
 // We must use this fork until https://github.com/mailru/easyjson/pull/372 is merged
 replace github.com/mailru/easyjson => github.com/cmaglie/easyjson v0.8.1
 
@@ -21,7 +19,7 @@ require (
 	github.com/djherbis/nio/v3 v3.0.1
 	github.com/fatih/color v1.18.0
 	github.com/go-git/go-git/v5 v5.14.0
-	github.com/gofrs/uuid/v5 v5.3.0
+	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/leonelquinteros/gotext v1.7.1
 	github.com/mailru/easyjson v0.7.7
 	github.com/marcinbor85/gohex v0.0.0-20210308104911-55fb1c624d84
